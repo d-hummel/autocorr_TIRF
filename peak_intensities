@@ -1,0 +1,93 @@
+
+"""
+Welcome,
+This is the curated Python code I used for the comparison of peak intensities. 
+This code processes the raw data and computes the average peak fluorescence intensity. 
+"""
+
+
+"""Enter the directory pathway and load in your data.
+
+The time information in the files should be the frame number, like 1, 2, 3, ...
+Columns in input data:
+  - frame number
+  - signal of protein of interest
+
+`x` will be a parameter for iterative executions later on.
+
+Files will be called *k1*, *k2*, *k3*, etc.
+Each *k* contains time information and fluorescence signal of interest.
+
+"""
+
+import numpy as np
+import csv
+import os
+os.chdir( 'C:\\Users\\my path\\...' )
+
+items = os.listdir( 'C:\\Users\\my path\\...' )
+file_list = [ ]
+for names in items:
+    if names.endswith( '.txt' ) :
+        file_list.append( names )
+
+x = range( 0 , len( file_list ) )    
+
+for i in x:
+    sample = [ [ ] , [ ] , [ ] ]
+    with open( file_list[i] , newline = '') as csvDataFile:
+        csvReader = csv.reader(csvDataFile, dialect = 'excel-tab')
+        next(csvReader)                                     
+        for row in csvReader:
+            sample = np.append( sample, 
+                               [ [ float( row[0] ) ] , 
+                                 [ float( row[5] ) ] , axis = 1 ) 
+            locals()[ 'k' + str(i) ] = [ sample[0] , sample[1] ]
+
+"""Gaps in the trajectories are filled with NaN.
+
+Data is renamed into *k_df_r1*, *k_df_r2*, *k_df_r3*, etc.
+"""
+
+import pandas as pd
+
+for i in x:
+    locals()['k_df' + str(i)] = pd.DataFrame( 
+        data = eval('k' + str(i))[1] , 
+        index = eval('k' + str(i))[0] )
+    locals()['k_df_r' + str(i)] = eval('k_df' + str(i)).reindex( 
+        index = range( 0 , max_frames ) )
+
+
+
+"""
+The fluorescence intensities are convolved with a 111 kernel and renamed *smooth_FI_1*, *smooth_FI_2*, *smooth_FI_3*, etc..
+The lowest intensity value of each trajectory is collected.
+"""
+
+from astropy.convolution import convolve as CVV
+from astropy.convolution import Box1DKernel
+
+min_collection = [  ]
+
+for i in x:
+    locals()['smooth_FI_' + str(i)] = CVV( eval('k_df_r' + str(i))[0] , Box1DKernel(3) )
+    min_collection = np.append( min_collection , np.nanmin( eval('k_df_r' + str(i))[0] ) )
+
+
+"""
+Collection of all peak values of the smoothened trajectories 
+subtracted by the median of the lowest intensity value of each trajectory.
+
+my_result is the mean peak intensity and its standard deviation. 
+"""
+
+
+max_collection = [ ]
+for i in x:
+    max_collection = np.append ( max_collection , 
+                                 np.nanmax( 
+                                    eval('smooth_FI_' + str(i)) - np.median( min_collection ) ) 
+                               )
+
+my_result = [ np.mean( max_collection ) , np.std( max_collection ) ]
